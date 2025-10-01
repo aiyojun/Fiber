@@ -6,7 +6,7 @@ public class Fiber
 {
     public Endpoint Endpoint;
     
-    public readonly ILogger Logger = FiberLogger.Logger;
+    public readonly ILogger Logger = LoggerProvider.Logger;
     
     public const int FiberPort = 9876;
 

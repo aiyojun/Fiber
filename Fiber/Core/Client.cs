@@ -17,7 +17,7 @@ public class Client : Endpoint, IDisposable
     private Task? _checkTask;
     private bool _disposed;
 
-    public readonly ILogger Logger = FiberLogger.Logger;
+    public readonly ILogger Logger = LoggerProvider.Logger;
     
     public Client(string ip, int port, int reconnectTimeout = 5)
     {
@@ -114,8 +114,8 @@ public class Client : Endpoint, IDisposable
 
     public override async Task SendAsync(Packet packet)
     {
-        var addr = Ip.Concat(BitConverter.GetBytes(Port)).ToArray();
-        Buffer.BlockCopy(addr, 0, packet.Source, 0, 8);
+        Buffer.BlockCopy(Ip.Concat(BitConverter.GetBytes(Port)).ToArray(), 0, packet.Source, 0, 8);
+        Logger.LogDebug("Received Packet\n{Packet}", packet.ToString());
         await SendAsync(packet.ToArray());
     }
 
@@ -123,10 +123,5 @@ public class Client : Endpoint, IDisposable
     {
         Logger.LogInformation("Client::OnMessage : {GetString}", Encoding.UTF8.GetString(data));
         return Task.CompletedTask;
-    }
-
-    public override Task<byte[]> OnRequest(byte[] data)
-    {
-        throw new NotImplementedException();
     }
 }

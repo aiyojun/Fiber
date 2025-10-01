@@ -8,9 +8,9 @@ namespace Fiber.Core;
 
 public class Server : Endpoint, IDisposable
 {
-    public readonly ILogger Logger = FiberLogger.Logger;
+    public readonly ILogger Logger = LoggerProvider.Logger;
     
-    public readonly Dictionary<string, FiberSession> Sessions = [];
+    public readonly Dictionary<string, Session> Sessions = [];
 
     private readonly IHost _server;
 
@@ -23,18 +23,18 @@ public class Server : Endpoint, IDisposable
         Ip = "\0\0\0\0"u8.ToArray();
         Port = port;
         _server = SuperSocketHostBuilder.Create<Packet, TransportPipelineFilter>()
-            .UseSession<FiberSession>()
-            .UsePackageHandler(async (session, package) => await ((FiberSession) session).OnServerReceived(package))
+            .UseSession<Session>()
+            .UsePackageHandler(async (session, package) => await ((Session) session).OnServerReceived(package))
             .UseSessionHandler(onConnected: session =>
             {
-                var fiberSession = (session as FiberSession)!;
+                var fiberSession = (session as Session)!;
                 Sessions.Add(fiberSession.Host!, fiberSession);
                 fiberSession.Server = this;
                 Logger.LogInformation("Fiber endpoint {FiberSessionHost} online", fiberSession.Host);
                 return ValueTask.CompletedTask;
             }, onClosed: (session, _) =>
             {
-                var fiberSession = (session as FiberSession)!;
+                var fiberSession = (session as Session)!;
                 Sessions.Remove(fiberSession.Host!);
                 return ValueTask.CompletedTask;
             })
@@ -66,6 +66,7 @@ public class Server : Endpoint, IDisposable
         var destination = Packet.ToAddress(packet.Target);
         if (!Sessions.TryGetValue(destination, out var session))
             throw new Exception($"{destination} offline");
+        Logger.LogDebug("Send Packet\n{Packet}", packet.ToString());
         await session.SendAsync(packet);
     }
 
@@ -73,10 +74,5 @@ public class Server : Endpoint, IDisposable
     {
         Logger.LogDebug("Server::OnMessage {GetString}", Encoding.UTF8.GetString(data));
         return Task.CompletedTask;
-    }
-
-    public override Task<byte[]> OnRequest(byte[] data)
-    {
-        throw new NotImplementedException();
     }
 }

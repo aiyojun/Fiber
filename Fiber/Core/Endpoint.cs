@@ -1,13 +1,12 @@
-﻿using System.Text;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace Fiber.Core;
 
 public abstract class Endpoint
 {
-    public readonly ILogger Logger = FiberLogger.Logger;
+    public readonly ILogger Logger = LoggerProvider.Logger;
     
-    private readonly Dictionary<string, TaskCompletionSource<byte[]>> _conditions = new();
+    private readonly Dictionary<string, TaskCompletionSource<Packet>> _conditions = new();
 
     public byte[] Ip = new byte[4];
 
@@ -19,16 +18,14 @@ public abstract class Endpoint
 
     public abstract Task OnMessage(byte[] data);
 
-    public abstract Task<byte[]> OnRequest(byte[] data);
+    public virtual Task<byte[]> OnRequest(byte[] data)
+    {
+        return Task.FromResult(!data.SequenceEqual("ping"u8.ToArray()) ? [] : "ack"u8.ToArray());
+    }
 
     public async Task OnReceived(Packet packet)
     {
-        Logger.LogDebug(new StringBuilder("---")
-            .Append($"  Packet : {BitConverter.ToString(packet.ToArray())}")
-            .Append($"  Source : {Packet.ToAddress(packet.Source)}")
-            .Append($"  Target : {Packet.ToAddress(packet.Target)}")
-            .Append($"   Proto : {packet.Proto}")
-            .Append("---").ToString());
+        Logger.LogDebug("Received Packet\n{Packet}", packet.ToString());
         switch (packet.Proto)
         {
             case Proto.Message:
@@ -39,38 +36,32 @@ public abstract class Endpoint
                 var reply = new Packet { Proto = Proto.Response };
                 Buffer.BlockCopy(packet.Source, 0, reply.Target, 0, 8);
                 Buffer.BlockCopy(packet.Target, 0, reply.Source, 0, 8);
-                reply.Payload = await OnRequest(packet.Payload);
+                reply.Payload = packet.Payload[..16].Concat(await OnRequest(packet.Payload[16..])).ToArray();
                 await SendAsync(reply);
                 break;
             }
             case Proto.Response:
             {
-                var uuidBytes = packet.Payload[..16];
-                if (!_conditions.TryGetValue(new Guid(uuidBytes).ToString("N"), out var condition)) return;
-                condition.SetResult(packet.Payload);
+                if (!_conditions.TryGetValue(new Guid(packet.Payload[..16]).ToString("N"), out var condition)) return;
+                condition.SetResult(packet);
                 break;
             }
         }
     }
 
-    public async Task<byte[]> Request(Endpoint receiver, byte[] data)
+    public async Task<Packet> Request(Packet packet)
     {
         var guid = Guid.NewGuid();
-        var packet = new Packet { Proto = Proto.Request, Payload = data };
-        Buffer.BlockCopy(Ip, 0, packet.Source, 0, 8);
-        Buffer.BlockCopy(receiver.Ip, 0, packet.Target, 0, 8);
+        packet.Proto = Proto.Request;
+        Buffer.BlockCopy(Ip.Concat(BitConverter.GetBytes(Port)).ToArray(), 0, packet.Source, 0, 8);
+        packet.Payload = guid.ToByteArray().Concat(packet.Payload).ToArray();
         await SendAsync(packet);
-        var condition = new TaskCompletionSource<byte[]>();
+        var condition = new TaskCompletionSource<Packet>();
         var key = guid.ToString("N");
         _conditions[key] = condition;
         var completed = await Task.WhenAny(condition.Task, Task.Delay(TimeSpan.FromMilliseconds(TimeoutMs)));
         _conditions.Remove(key);
         if (completed != condition.Task) throw new TimeoutException();
-        var resp = await condition.Task;
-        using var stream = new MemoryStream(resp, 16, resp.Length - 16);
-        using var reader = new BinaryReader(stream);
-        return reader.ReadBoolean()
-            ? throw new Exception(reader.ReadString())
-            : reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position));
+        return await condition.Task;
     }
 }

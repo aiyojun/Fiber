@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Text;
 
 namespace Fiber.Core;
 
@@ -11,6 +12,18 @@ public class Packet
     public byte Proto;
     
     public byte[] Payload = [];
+
+    public override string ToString()
+    {
+        var packet = this;
+        return new StringBuilder("---\n")
+            .Append($"  Packet : {BitConverter.ToString(packet.ToArray())}\n")
+            .Append($"  Source : {Packet.ToAddress(packet.Source)}\n")
+            .Append($"  Target : {Packet.ToAddress(packet.Target)}\n")
+            .Append($"   Proto : {packet.Proto}\n")
+            .Append($" Payload : {BitConverter.ToString(packet.Payload)}\n")
+            .Append("---").ToString();
+    }
 
     public byte[] ToArray()
     {

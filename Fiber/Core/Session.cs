@@ -4,9 +4,9 @@ using SuperSocket.Server;
 
 namespace Fiber.Core;
 
-public class FiberSession : AppSession
+public class Session : AppSession
 {
-    public readonly ILogger Logger = FiberLogger.Logger;
+    public readonly ILogger Logger = LoggerProvider.Logger;
     
     public Server? Server { get; set; }
     
@@ -26,7 +26,6 @@ public class FiberSession : AppSession
 
     public async Task OnServerReceived(Packet packet)
     {
-        Logger.LogDebug("Server::OnServerReceived : {ToString}, Source : {ToAddress}, Target : {S}", BitConverter.ToString(packet.ToArray()), Packet.ToAddress(packet.Source), Packet.ToAddress(packet.Target));
         var receiver = Packet.ToAddress(packet.Target);
         if (receiver == $"0.0.0.0:{Server!.Port}")
             await Server!.OnReceived(packet);

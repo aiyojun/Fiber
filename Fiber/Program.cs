@@ -3,11 +3,11 @@
 using System.Text;
 using Fiber.Core;
 
-var fiber = new Fiber.Core.Fiber("192.168.1.20");
+var master = "192.168.1.20";
+var fiber = new Fiber.Core.Fiber(master);
 Console.WriteLine();
 while (true)
 {
-    Console.Write("> ");
     var x = Console.ReadLine();
     if (x == null) continue;
     if (x.StartsWith("exit"))
