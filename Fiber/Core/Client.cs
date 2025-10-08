@@ -7,7 +7,7 @@ namespace Fiber.Core;
 
 public class Client : Endpoint, IDisposable
 {
-    private IEasyClient<Packet> _client;
+    private readonly IEasyClient<Packet> _client;
     private readonly string _serverIp;
     private readonly int _serverPort;
     private readonly int _interval;

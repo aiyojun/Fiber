@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Fiber.Core;
 
+[Obsolete("Use Client!")]
 public class NativeClient : Endpoint, IDisposable
 {
     private readonly string _serverIp;
