@@ -12,6 +12,6 @@ internal class TransportPipelineFilter() : FixedHeaderPipelineFilter<Packet>(21)
 
     protected override Packet DecodePackage(ref ReadOnlySequence<byte> buffer)
     {
-        return Packet.FromSequence(ref buffer);
+        return Helper.FromSequence(ref buffer);
     }
 }

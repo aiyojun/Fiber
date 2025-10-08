@@ -16,13 +16,24 @@ public class Packet
     public override string ToString()
     {
         var packet = this;
-        return new StringBuilder("---\n")
-            .Append($"  Packet : {BitConverter.ToString(packet.ToArray())}\n")
-            .Append($"  Source : {Packet.ToAddress(packet.Source)}\n")
-            .Append($"  Target : {Packet.ToAddress(packet.Target)}\n")
-            .Append($"   Proto : {packet.Proto}\n")
-            .Append($" Payload : {BitConverter.ToString(packet.Payload)}\n")
-            .Append("---").ToString();
+        return new StringBuilder()
+            .Append("Proto[")
+            .Append(packet.Proto)
+            .Append("] ")
+            .Append(Helper.ToAddress(packet.Source))
+            .Append(" -> ")
+            .Append(Helper.ToAddress(packet.Target))
+            .Append(" (Payload ")
+            .Append(packet.Payload.Length)
+            .Append(" bytes)")
+            // .Append("---\n")
+            // .Append($"  Packet : {BitConverter.ToString(packet.ToArray())}\n")
+            // .Append($"  Source : {Packet.ToAddress(packet.Source)}\n")
+            // .Append($"  Target : {Packet.ToAddress(packet.Target)}\n")
+            // .Append($"   Proto : {packet.Proto}\n")
+            // .Append($" Payload : {BitConverter.ToString(packet.Payload)}\n")
+            // .Append("---")
+            .ToString();
     }
 
     public byte[] ToArray()
@@ -35,48 +46,5 @@ public class Packet
         buffer[20] = Proto;
         Buffer.BlockCopy(Payload, 0, buffer, 21, Payload.Length);
         return buffer;
-    }
-
-    public static void AssignAddress(byte[] dst, byte[] src)
-    {
-        Buffer.BlockCopy(src, 0, dst, 0, 8);
-    }
-    
-    public static Packet FromSequence(ref ReadOnlySequence<byte> sequence)
-    {
-        var packet = new Packet();
-        sequence.Slice(0, 8).CopyTo(packet.Source);
-        sequence.Slice(8, 8).CopyTo(packet.Target);
-        var t = sequence.Slice(16, 4).ToArray();
-        var length = BitConverter.ToUInt32(t);
-        packet.Proto = sequence.Slice(20, 1).FirstSpan[0];
-        packet.Payload = sequence.Slice(21, length).ToArray();
-        return packet;
-    }
-
-    public static string ToAddress(byte[] address)
-    {
-        if (address.Length != 8)
-            throw new ArgumentException("address length error");
-        var span = address.AsSpan();
-        return string.Join(".", span[..4].ToArray()) + ":" + BitConverter.ToUInt32(span[4..8]);
-    }
-
-    public static byte[] ParseAddress(string address)
-    {
-        var items = address.Split(':');
-        var ip = items[0].Split('.').Select(e => (byte) int.Parse(e)).ToArray();
-        var port = int.Parse(items[1]);
-        return ip.Concat(BitConverter.GetBytes(port)).ToArray();
-    }
-
-    public static byte[] ConvertAddress(byte[] ip, int port)
-    {
-        return ip.Concat(BitConverter.GetBytes(port)).ToArray();
-    }
-
-    public static uint ReadPacketSizeFromHeader(ReadOnlySpan<byte> span)
-    {
-        return BitConverter.ToUInt32(span.Slice(16, 4));
     }
 }

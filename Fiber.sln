@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# 
+#
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fiber", "Fiber\Fiber.csproj", "{EFCE8A30-93CD-4E58-8956-880A641A341A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiberDemo", "FiberDemo\FiberDemo.csproj", "{524BF928-589C-47B8-ABFC-4B071EA191ED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NaiveServerDemo", "NaiveServerDemo\NaiveServerDemo.csproj", "{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,5 +21,9 @@ Global
 		{524BF928-589C-47B8-ABFC-4B071EA191ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{524BF928-589C-47B8-ABFC-4B071EA191ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{524BF928-589C-47B8-ABFC-4B071EA191ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

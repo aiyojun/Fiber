@@ -4,39 +4,65 @@ using System.Diagnostics;
 using System.Text;
 using Fiber.Core;
 
-var fiber = new Fiber.Core.Fiber("192.168.1.20", true);
-var client = (Client) fiber.Endpoint;
-Console.WriteLine();
-var master = "0.0.0.0:9876";
+if (args.Length == 0) throw new Exception("Usage : fiber master_ip");
+var masterIp = args[0];
+var runAsClient = args.Length > 1 && args[1] == "cli";
+var fiber = new Fiber.Core.Fiber(masterIp, runAsClient);
+var endpoint = fiber.Endpoint;
+Thread.Sleep(500);
+// Console.WriteLine();
+// Console.Write("> ");
 while (true)
 {
     var x = Console.ReadLine();
-    if (x == null) continue;
-    if (x.StartsWith("exit"))
+    if (x == null) break;
+    x = x.Trim();
+    try
     {
-        break;
+        if (x.Equals("> exit")) break;
+        if (x.Equals("> list"))
+        {
+            var hosts = endpoint is Server server ? server.List() : await ((Client) endpoint).List();
+            Console.WriteLine("Online endpoints :\n---");
+            foreach (var host in hosts)
+            {
+                Console.WriteLine($"  {host}");
+            }
+            Console.WriteLine("---");
+        }
+        if (x.StartsWith("> ping "))
+        {
+            var targetHost = x[7..].Trim();
+            var packet = new Packet { Proto = Proto.Request, Payload = "ping"u8.ToArray() };
+            Helper.AssignAddress(packet.Target, Helper.ParseAddress(targetHost));
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var resp = await endpoint.Request(packet);
+                sw.Stop();
+                Console.WriteLine($"{targetHost} Reply : {Encoding.UTF8.GetString(resp.Payload[16..])} [{sw.ElapsedMilliseconds} ms]");
+            }
+            catch (TimeoutException)
+            {
+                Console.WriteLine($"{targetHost} Offline");
+            }
+        }
+        if (x.StartsWith("> message "))
+        {
+            x = x[10..].Trim();
+            var spaceIndex = x.IndexOf(' ');
+            if (spaceIndex < 0) throw new Exception("Format :\n> message target_host content...");
+            var targetHost = x[..spaceIndex];
+            // Console.WriteLine($"Host : {targetHost}");
+            var content = x[(spaceIndex + 1)..];
+            var packet = new Packet { Proto = Proto.Message, Payload = Encoding.UTF8.GetBytes(content) };
+            Helper.AssignAddress(packet.Target, Helper.ParseAddress(targetHost));
+            await endpoint.SendAsync(packet);
+        }
     }
-    if (x.StartsWith("message#"))
+    catch (Exception e)
     {
-        Console.WriteLine($"- Client : {x[8..]}");
-        var packet = new Packet { Proto = Proto.Message, Payload = Encoding.UTF8.GetBytes(x[8..]) };
-        Packet.AssignAddress(packet.Target, Packet.ParseAddress(master));
-        await client.SendAsync(packet);
+        Console.Error.WriteLine(e);
     }
-    else if (x.StartsWith("route#"))
-    {
-        var items = x.Split("#");
-        var packet = new Packet { Proto = Proto.Message, Payload = Encoding.UTF8.GetBytes(items[2]) };
-        Packet.AssignAddress(packet.Target, Packet.ParseAddress(items[1]));
-        await client.SendAsync(packet);
-    }
-    else if (x == "ping")
-    {
-        var packet = new Packet { Proto = Proto.Request, Payload = "ping"u8.ToArray() };
-        Packet.AssignAddress(packet.Target, Packet.ParseAddress(master));
-        var sw = Stopwatch.StartNew();
-        var resp = await client.Request(packet);
-        sw.Stop();
-        Console.WriteLine($"- Cost : {sw.ElapsedMilliseconds} ms, Response : " + Encoding.UTF8.GetString(resp.Payload[16..]));
-    }
+
 }
