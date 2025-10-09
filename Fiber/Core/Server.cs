@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SuperSocket.Server;
@@ -20,8 +21,8 @@ public class Server : Endpoint, IDisposable
     
     public Server(int port)
     {
-        Ip = "\0\0\0\0"u8.ToArray();
-        Port = port;
+        IPEndPoint = new IPEndPoint(0, port);
+        Replies.Add(packet => Task.FromResult(packet.RequestContent.SequenceEqual("online"u8.ToArray()) ? packet.BuildResponse(Encoding.UTF8.GetBytes(string.Join(";", List()))) : null));
         _server = (SuperSocketService<Packet>) SuperSocketHostBuilder.Create<Packet, TransportPipelineFilter>()
             .UseSession<Session>()
             .UseInProcSessionContainer()
@@ -31,22 +32,19 @@ public class Server : Endpoint, IDisposable
                 var fiberSession = (session as Session)!;
                 fiberSession.Wrapper = this;
                 return ValueTask.CompletedTask;
-            }, onClosed: (session, _) =>
-            {
-                var fiberSession = (session as Session)!;
-                return ValueTask.CompletedTask;
-            })
+            }, onClosed: (_, _) => ValueTask.CompletedTask)
             .ConfigureSuperSocket(options =>
             {
                 options.Name = "Fiber Server";
                 options.Listeners =
                 [
-                    new ListenOptions { Ip = "Any", Port = Port }
+                    new ListenOptions { Ip = "Any", Port = IPEndPoint.Port }
                 ];
             })
             .ConfigureLogging((_, builder) => builder.ClearProviders())
             .BuildAsServer();
         _server.StartAsync(_token.Token);
+        Logger.LogInformation("Run as Server, endpoint : {endpoint}", IPEndPoint.ToString());
     }
     
     
@@ -59,7 +57,7 @@ public class Server : Endpoint, IDisposable
 
     public override async Task SendAsync(Packet packet)
     {
-        var receiver = Helper.ToAddress(packet.Target);
+        var receiver = packet.Target;
         var server = this;
         if (server.PointToSelf(packet.Target))
         {
@@ -67,28 +65,15 @@ public class Server : Endpoint, IDisposable
             await server.OnReceived(packet);
             return;
         }
-        var session = GetSessions().FirstOrDefault(e => e.Host == receiver);
+        var session = GetSessions().FirstOrDefault(e => receiver.Equals(e.RemoteEndPoint));
         if (session == null)
         {
-            Logger.LogDebug("Not found session, receiver : {}", receiver);
+            Logger.LogDebug("Not found session, receiver : {}", receiver.ToString());
             throw new Exception($"{receiver} offline.");
         }
-        Logger.LogDebug("FindSession : {1}, Packet receiver : {3}", session.Host, receiver);
-        Buffer.BlockCopy(Ip.Concat(BitConverter.GetBytes(Port)).ToArray(), 0, packet.Source, 0, 8);
+        // Logger.LogDebug("FindSession : {1}, Packet receiver : {3}", session.RemoteEndPoint.ToString(), receiver.ToString());
+        packet.Source = IPEndPoint;
         await session.SendAsync(packet);
-    }
-
-    public override Task OnMessage(byte[] data)
-    {
-        Logger.LogDebug("Server::OnMessage {GetString}", Encoding.UTF8.GetString(data));
-        return Task.CompletedTask;
-    }
-
-    public override Task<byte[]> OnRequest(byte[] data)
-    {
-        if (data.SequenceEqual("online"u8.ToArray()))
-            return Task.FromResult(Encoding.UTF8.GetBytes(string.Join(";", List())));
-        return base.OnRequest(data);
     }
 
     public Session[] GetSessions()
@@ -98,8 +83,8 @@ public class Server : Endpoint, IDisposable
     
     public string[] List()
     {
-        var r = GetSessions().Select(e => e.Host!).ToList();
-        r.Add(Helper.ToAddress(Ip.Concat(BitConverter.GetBytes(Port)).ToArray()));
+        var r = GetSessions().Select(e => e.RemoteEndPoint.ToString()!).ToList();
+        r.Add(IPEndPoint.ToString());
         return r.ToArray();
     }
 }

@@ -1,6 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using System.Diagnostics;
+using System.Net;
 using System.Text;
 using Fiber.Core;
 
@@ -9,6 +10,7 @@ var masterIp = args[0];
 var runAsClient = args.Length > 1 && args[1] == "cli";
 var fiber = new Fiber.Core.Fiber(masterIp, runAsClient);
 var endpoint = fiber.Endpoint;
+endpoint.Received += packet => Console.WriteLine("[MESSAGE] " + Encoding.UTF8.GetString(packet.Payload)); 
 Thread.Sleep(500);
 // Console.WriteLine();
 // Console.Write("> ");
@@ -33,8 +35,7 @@ while (true)
         if (x.StartsWith("> ping "))
         {
             var targetHost = x[7..].Trim();
-            var packet = new Packet { Proto = Proto.Request, Payload = "ping"u8.ToArray() };
-            Helper.AssignAddress(packet.Target, Helper.ParseAddress(targetHost));
+            var packet = endpoint.BuildRequest(targetHost, "ping"u8.ToArray());
             try
             {
                 var sw = Stopwatch.StartNew();
@@ -53,11 +54,8 @@ while (true)
             var spaceIndex = x.IndexOf(' ');
             if (spaceIndex < 0) throw new Exception("Format :\n> message target_host content...");
             var targetHost = x[..spaceIndex];
-            // Console.WriteLine($"Host : {targetHost}");
             var content = x[(spaceIndex + 1)..];
-            var packet = new Packet { Proto = Proto.Message, Payload = Encoding.UTF8.GetBytes(content) };
-            Helper.AssignAddress(packet.Target, Helper.ParseAddress(targetHost));
-            await endpoint.SendAsync(packet);
+            await endpoint.SendAsync(endpoint.BuildMessage(targetHost, Encoding.UTF8.GetBytes(content)));
         }
     }
     catch (Exception e)

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Net;
+using Microsoft.Extensions.Logging;
 
 namespace Fiber.Core;
 
@@ -15,7 +16,6 @@ public class Fiber
         var masterNetworkPrefix = string.Join(".", masterIp.Split('.')[..3]) + ".";
         var currentIp = Helper.GetNetworkAddress(masterNetworkPrefix);
         Endpoint = masterIp == currentIp && !runAsClient ? new Server(FiberPort) : new Client(masterIp, FiberPort);
-        if (Endpoint is Server) Endpoint.Ip = currentIp.Split('.').Select(e => (byte) int.Parse(e)).ToArray();
-        Logger.LogInformation("Run as {Name}", Endpoint.GetType().Name);
+        if (Endpoint is Server) Endpoint.IPEndPoint = IPEndPoint.Parse($"{currentIp}:{FiberPort}");
     }
 }

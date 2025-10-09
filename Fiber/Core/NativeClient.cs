@@ -9,9 +9,8 @@ namespace Fiber.Core;
 [Obsolete("Use Client!")]
 public class NativeClient : Endpoint, IDisposable
 {
-    private readonly string _serverIp;
-    private readonly int _serverPort;
     private readonly int _interval;
+    private readonly IPEndPoint _serverAddress;
     private readonly CancellationTokenSource _cancellation;
     private TcpClient? _client;
     private NetworkStream? _stream;
@@ -22,8 +21,7 @@ public class NativeClient : Endpoint, IDisposable
     
     public NativeClient(string ip, int port, int reconnectTimeout = 5)
     {
-        _serverIp = ip;
-        _serverPort = port;
+        _serverAddress = IPEndPoint.Parse($"{ip}:{port}");
         _interval = reconnectTimeout;
         _cancellation = new CancellationTokenSource();
         _checkTask = Task.Run(() => KeepAlive(_cancellation.Token));
@@ -54,7 +52,7 @@ public class NativeClient : Endpoint, IDisposable
     public async Task OnClientReceived(byte[] buffer)
     {
         var sequence = new ReadOnlySequence<byte>(buffer);
-        var packet = Helper.FromSequence(ref sequence);
+        var packet = Packet.FromSequence(ref sequence);
         await OnReceived(packet);
     }
     
@@ -67,17 +65,16 @@ public class NativeClient : Endpoint, IDisposable
                 try
                 {
                     _client = new TcpClient();
-                    await _client.ConnectAsync(_serverIp, _serverPort, token);
+                    await _client.ConnectAsync(_serverAddress.Address, _serverAddress.Port, token);
                     var endpoint = (_client.Client.LocalEndPoint as IPEndPoint)!;
-                    Ip = Helper.GetNetworkAddress(string.Join(".", _serverIp.Split('.')[..3]) + ".").Split('.').Select(e => (byte) int.Parse(e)).ToArray();
-                    Port = endpoint.Port;
+                    IPEndPoint = IPEndPoint.Parse($"{Helper.GetNetworkAddress(string.Join(".", _serverAddress.Address.ToString().Split('.')[..3]) + ".")}:{endpoint.Port}");
                     _stream = _client.GetStream();
                     Logger.LogInformation("Server side connected");
                     _ = Task.Run(() => Work(_stream, token), token);
                 }
                 catch (Exception e)
                 {
-                    Logger.LogError("Failed to connect fiber master[{ServerIp}:{ServerPort}], error : {Exception}", _serverIp, _serverPort, e);
+                    Logger.LogError("Failed to connect fiber master[{ServerIp}], error : {Exception}", _serverAddress.ToString(), e);
                 }
             }
 
@@ -97,7 +94,7 @@ public class NativeClient : Endpoint, IDisposable
                 {
                     break;
                 } // disconnect
-                var length = Helper.ReadPacketSizeFromHeader(header);
+                var length = Packet.ReadPacketSizeFromHeader(header);
                 if (length > int.MaxValue) throw new Exception("Packet size too large");
                 var buffer = new byte[length];
                 var received = 0;
@@ -123,21 +120,19 @@ public class NativeClient : Endpoint, IDisposable
             await OnReceived(packet);
             return;
         }
-        Buffer.BlockCopy(Ip.Concat(BitConverter.GetBytes(Port)).ToArray(), 0, packet.Source, 0, 8);
+        packet.Source = IPEndPoint;
         Logger.LogDebug("Packet Send : {Packet}", packet.ToString());
         await SendAsync(packet.ToArray());
     }
 
-    public override Task OnMessage(byte[] data)
-    {
-        Logger.LogInformation("Client::OnMessage : {GetString}", Encoding.UTF8.GetString(data));
-        return Task.CompletedTask;
-    }
-    
     public async Task<string[]> List()
     {
-        var packet = new Packet { Proto = Proto.Request, Payload = "online"u8.ToArray() };
-        Helper.AssignAddress(packet.Target, Helper.ParseAddress(_serverIp + ":" + _serverPort));
+        var packet = new Packet
+        {
+            Proto = ProtoBag.Request, 
+            Target = _serverAddress,
+            Payload = "online"u8.ToArray()
+        };
         return Encoding.UTF8.GetString((await Request(packet)).Payload[16..]).Split(';');
     }
 }

@@ -1,31 +1,66 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Net;
+using Microsoft.Extensions.Logging;
 
 namespace Fiber.Core;
 
 public abstract class Endpoint
 {
+    public event Action<Packet>? Received;
+
+    public readonly List<Func<Packet, Task<Packet?>>> Replies = [
+        packet => Task.FromResult(packet.RequestContent.SequenceEqual("ping"u8.ToArray()) ? packet.BuildResponse("ack"u8.ToArray()) : null)
+    ];
+    
     public readonly ILogger Logger = LoggerProvider.Logger;
     
     private readonly Dictionary<string, TaskCompletionSource<Packet>> _conditions = new();
 
-    public byte[] Ip = new byte[4];
-
-    public int Port = 9876;
-
+    public IPEndPoint IPEndPoint = new(0, 0);
+    
     public int TimeoutMs { get; set; } = 5000;
 
-    public bool PointToSelf(byte[] address)
+    public bool PointToSelf(IPEndPoint address)
     {
-        return Ip.Concat(BitConverter.GetBytes(Port)).ToArray().SequenceEqual(address);
+        return IPEndPoint.Equals(address);
+    }
+    
+    public Packet BuildMessage(string receiver, byte[] data)
+    {
+        return new Packet { Proto = ProtoBag.Message, Source = IPEndPoint, Target = IPEndPoint.Parse(receiver), Payload = data };
+    }
+    
+    public Packet BuildRequest(IPEndPoint receiver, byte[] data)
+    {
+        var buf = new byte[16 + data.Length];
+        Buffer.BlockCopy(data, 0, buf, 16, data.Length);
+        return new Packet { Proto = ProtoBag.Request, Source = IPEndPoint, Target = receiver, Payload = buf };
+    }
+    
+    public Packet BuildRequest(string receiver, byte[] data)
+    {
+        return BuildRequest(IPEndPoint.Parse(receiver), data);
     }
 
     public abstract Task SendAsync(Packet packet);
 
-    public abstract Task OnMessage(byte[] data);
-
-    public virtual Task<byte[]> OnRequest(byte[] data)
+    public async Task<Packet> OnRequest(Packet packet)
     {
-        return Task.FromResult(!data.SequenceEqual("ping"u8.ToArray()) ? [] : "ack"u8.ToArray());
+        byte[] payload = [];
+        foreach (var reply in Replies)
+        {
+            try
+            {
+                var ret = await reply.Invoke(packet);
+                if (ret == null) continue;
+                payload = ret.Payload;
+                break;
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "error while generating response");
+            }
+        }
+        return new Packet { Proto = ProtoBag.Response, Target = packet.Source, Source = IPEndPoint, Payload = payload };
     }
     
     public async Task OnReceived(Packet packet)
@@ -35,19 +70,15 @@ public abstract class Endpoint
             Logger.LogDebug("Packet Recv : {Packet}", packet.ToString());
             switch (packet.Proto)
             {
-                case Proto.Message:
-                    await OnMessage(packet.Payload);
+                case ProtoBag.Message:
+                    Received?.Invoke(packet);
                     break;
-                case Proto.Request:
+                case ProtoBag.Request:
                 {
-                    var reply = new Packet { Proto = Proto.Response };
-                    Buffer.BlockCopy(packet.Source, 0, reply.Target, 0, 8);
-                    Buffer.BlockCopy(packet.Target, 0, reply.Source, 0, 8);
-                    reply.Payload = packet.Payload[..16].Concat(await OnRequest(packet.Payload[16..])).ToArray();
-                    await SendAsync(reply);
+                    await SendAsync(await OnRequest(packet));
                     break;
                 }
-                case Proto.Response:
+                case ProtoBag.Response:
                 {
                     if (!_conditions.TryGetValue(new Guid(packet.Payload[..16]).ToString("N"), out var condition))
                     {
@@ -68,9 +99,10 @@ public abstract class Endpoint
     public async Task<Packet> Request(Packet packet)
     {
         var guid = Guid.NewGuid();
-        packet.Proto = Proto.Request;
-        Buffer.BlockCopy(Ip.Concat(BitConverter.GetBytes(Port)).ToArray(), 0, packet.Source, 0, 8);
-        packet.Payload = guid.ToByteArray().Concat(packet.Payload).ToArray();
+        packet.Proto = ProtoBag.Request;
+        packet.Source = IPEndPoint;
+        var id = guid.ToByteArray();
+        Buffer.BlockCopy(id, 0, packet.Payload, 0, id.Length);
         var condition = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
         var key = guid.ToString("N");
         _conditions[key] = condition;
