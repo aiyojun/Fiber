@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using SuperSocket.Client;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public class Client : Endpoint, IDisposable
 {

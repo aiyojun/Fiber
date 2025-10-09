@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using Microsoft.Extensions.Logging;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public class Fiber
 {

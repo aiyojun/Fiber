@@ -3,7 +3,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using Fiber.Core;
+using FiberDistro.Core;
 
 var addr = "192.168.1.10:51243";
 var endpoint = IPEndPoint.Parse(addr);

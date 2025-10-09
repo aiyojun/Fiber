@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using SuperSocket.ProtoBase;
 
-namespace Fiber.Naive;
+namespace FiberDistro.Naive;
 
 public class PipelineFilter : PipelineFilterBase<byte[]?>
 {

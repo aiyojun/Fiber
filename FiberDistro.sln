@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 #
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fiber", "Fiber\Fiber.csproj", "{EFCE8A30-93CD-4E58-8956-880A641A341A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiberDistro", "FiberDistro\FiberDistro.csproj", "{EFCE8A30-93CD-4E58-8956-880A641A341A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiberDemo", "FiberDemo\FiberDemo.csproj", "{524BF928-589C-47B8-ABFC-4B071EA191ED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiberDistroDemo", "FiberDistroDemo\FiberDistroDemo.csproj", "{524BF928-589C-47B8-ABFC-4B071EA191ED}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NaiveServerDemo", "NaiveServerDemo\NaiveServerDemo.csproj", "{ADAD1D6E-2A23-41A8-B140-26490C65AD6E}"
 EndProject

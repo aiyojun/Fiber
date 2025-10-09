@@ -2,7 +2,7 @@
 using SuperSocket.Server;
 using SuperSocket.Server.Abstractions.Session;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public class Session : AppSession
 {

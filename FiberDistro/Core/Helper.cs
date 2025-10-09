@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public static class Helper
 {

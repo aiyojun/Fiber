@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using SuperSocket.ProtoBase;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 internal class TransportPipelineFilter() : FixedHeaderPipelineFilter<Packet>(Packet.HeaderSize)
 {

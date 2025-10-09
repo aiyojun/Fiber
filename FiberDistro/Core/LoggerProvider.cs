@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public static class LoggerProvider
 {

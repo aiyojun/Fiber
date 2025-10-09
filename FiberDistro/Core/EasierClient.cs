@@ -4,7 +4,7 @@ using SuperSocket.Client;
 using SuperSocket.Connection;
 using SuperSocket.ProtoBase;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public class EasierClient : EasyClient<Packet>
 {

@@ -1,4 +1,4 @@
-﻿namespace Fiber.Core;
+﻿namespace FiberDistro.Core;
 
 public class ProtoBag
 {

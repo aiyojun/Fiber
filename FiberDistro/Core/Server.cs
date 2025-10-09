@@ -7,7 +7,7 @@ using SuperSocket.Server.Abstractions;
 using SuperSocket.Server.Abstractions.Session;
 using SuperSocket.Server.Host;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 public class Server : Endpoint, IDisposable
 {

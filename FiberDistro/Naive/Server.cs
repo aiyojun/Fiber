@@ -5,7 +5,7 @@ using SuperSocket.Server;
 using SuperSocket.Server.Abstractions;
 using SuperSocket.Server.Host;
 
-namespace Fiber.Naive;
+namespace FiberDistro.Naive;
 
 public class Server
 {

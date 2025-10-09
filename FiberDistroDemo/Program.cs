@@ -3,12 +3,12 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text;
-using Fiber.Core;
+using FiberDistro.Core;
 
 if (args.Length == 0) throw new Exception("Usage : fiber master_ip");
 var masterIp = args[0];
 var runAsClient = args.Length > 1 && args[1] == "cli";
-var fiber = new Fiber.Core.Fiber(masterIp, runAsClient);
+var fiber = new Fiber(masterIp, runAsClient);
 var endpoint = fiber.Endpoint;
 endpoint.Received += packet => Console.WriteLine("[MESSAGE] " + Encoding.UTF8.GetString(packet.Payload)); 
 Thread.Sleep(500);

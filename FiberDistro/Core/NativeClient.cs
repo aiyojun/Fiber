@@ -4,7 +4,7 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace Fiber.Core;
+namespace FiberDistro.Core;
 
 [Obsolete("Use Client!")]
 public class NativeClient : Endpoint, IDisposable
