@@ -1,16 +1,15 @@
 ﻿using System.Buffers;
-using System.Net;
 using System.Text;
 
 namespace FiberDistro.Core;
 
 public class Packet
 {
-    public const int HeaderSize = 37;
+    public const int HeaderSize = 29;
 
-    public IPEndPoint Source = new(0, 0);
+    public Location Source = Location.Empty;
     
-    public IPEndPoint Target = new(0, 0);
+    public Location Target = Location.Empty;
 
     public byte Proto;
     
@@ -34,21 +33,21 @@ public class Packet
     
     public static Packet FromSequence(ref ReadOnlySequence<byte> sequence)
     {
-        var length = BitConverter.ToUInt32(sequence.Slice(32, 4).ToArray());
+        var length = BitConverter.ToUInt32(sequence.Slice(HeaderSize - 5, 4).ToArray());
         return new Packet
         {
-            Source = Helper.UnserializeIPEndPoint(sequence.Slice(0, 16).ToArray()),
-            Target = Helper.UnserializeIPEndPoint(sequence.Slice(16, 16).ToArray()),
-            Proto = sequence.Slice(36, 1).FirstSpan[0],
-            Payload = sequence.Slice(37, length).ToArray()
+            Source = Location.Deserialize(sequence.Slice(0, 12).ToArray()),
+            Target = Location.Deserialize(sequence.Slice(12, 12).ToArray()),
+            Proto = sequence.Slice(HeaderSize - 1, 1).FirstSpan[0],
+            Payload = sequence.Slice(HeaderSize, length).ToArray()
         };
     }
 
     public byte[] ToArray()
     {
         var buffer = new byte[HeaderSize + Payload.Length];
-        var source = Source.Serialize().Buffer.ToArray();
-        var target = Target.Serialize().Buffer.ToArray();
+        var source = Source.Serialize();
+        var target = Target.Serialize();
         Buffer.BlockCopy(source, 0, buffer, 0, source.Length);
         Buffer.BlockCopy(target, 0, buffer, source.Length, target.Length);
         var length = BitConverter.GetBytes((uint) Payload.Length);
@@ -60,17 +59,23 @@ public class Packet
     
     public static uint ReadPacketSizeFromHeader(ReadOnlySpan<byte> span)
     {
-        return BitConverter.ToUInt32(span.Slice(32, 4));
+        return BitConverter.ToUInt32(span.Slice(HeaderSize - 5, 4));
     }
     
     public static uint ReadPacketSizeFromHeaderSequence(ReadOnlySequence<byte> span)
     {
-        return BitConverter.ToUInt32(span.Slice(32, 4).ToArray());
+        return BitConverter.ToUInt32(span.Slice(HeaderSize - 5, 4).ToArray());
     }
 
     public Packet BuildResponse(byte[] content)
     {
-        return new Packet { Proto = ProtoBag.Response, Source = Target, Target = Source, Payload = Payload[..16].Concat(content).ToArray() };
+        return new Packet
+        {
+            Proto = ProtoBag.Response,
+            Source = Target, 
+            Target = Source,
+            Payload = Payload[..16].Concat(content).ToArray()
+        };
     }
 
     public byte[] RequestContent => Payload[16..];

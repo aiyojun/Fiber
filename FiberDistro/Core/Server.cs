@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SuperSocket.Server;
@@ -9,82 +8,75 @@ using SuperSocket.Server.Host;
 
 namespace FiberDistro.Core;
 
-public class Server : Endpoint, IDisposable
+public class Server : Transceiver, IDisposable
 {
     public readonly ILogger Logger = LoggerProvider.Logger;
     
     private readonly SuperSocketService<Packet> _server;
-
-    private readonly CancellationTokenSource _token = new();
+    
+    private readonly CancellationTokenSource _cancellation = new();
     
     private bool _disposed;
-    
-    public Server(int port)
+
+    public Server(IPEndPoint binding)
     {
-        IPEndPoint = new IPEndPoint(0, port);
-        Replies.Add(packet => Task.FromResult(packet.RequestContent.SequenceEqual("online"u8.ToArray()) ? packet.BuildResponse(Encoding.UTF8.GetBytes(string.Join(";", List()))) : null));
-        _server = (SuperSocketService<Packet>) SuperSocketHostBuilder.Create<Packet, TransportPipelineFilter>()
+        LocalEndPoint = binding;
+        _server = (SuperSocketService<Packet>)SuperSocketHostBuilder.Create<Packet, TransportPipelineFilter>()
             .UseSession<Session>()
             .UseInProcSessionContainer()
-            .UsePackageHandler(async (session, package) => await ((Session) session).OnServerReceived(package))
-            .UseSessionHandler(onConnected: session =>
-            {
-                var fiberSession = (session as Session)!;
-                fiberSession.Wrapper = this;
-                return ValueTask.CompletedTask;
-            }, onClosed: (_, _) => ValueTask.CompletedTask)
+            .UsePackageHandler(async (session, package) => await OnReceived(package, (Session)session))
             .ConfigureSuperSocket(options =>
             {
                 options.Name = "Fiber Server";
-                options.Listeners =
-                [
-                    new ListenOptions { Ip = "Any", Port = IPEndPoint.Port }
-                ];
+                options.Listeners = [ new ListenOptions { Ip = "Any", Port = LocalEndPoint.Port } ];
             })
             .ConfigureLogging((_, builder) => builder.ClearProviders())
             .BuildAsServer();
-        _server.StartAsync(_token.Token);
-        Logger.LogInformation("Run as Server, endpoint : {endpoint}", IPEndPoint.ToString());
+        _server.StartAsync(_cancellation.Token);
     }
-    
-    
+
+    ~Server()
+    {
+        if (_disposed) return;
+        Dispose();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
-        _server.StopAsync(_token.Token).Wait();
+        _cancellation.Cancel();
+        _server.StopAsync(_cancellation.Token).Wait();
         _disposed = true;
     }
 
+    public Session[] Sessions => _server.GetSessionContainer().GetSessions().Select(e => (Session)e).ToArray();
+
     public override async Task SendAsync(Packet packet)
     {
-        var receiver = packet.Target;
-        var server = this;
-        if (server.PointToSelf(packet.Target))
-        {
-            Logger.LogDebug("Directly arrive");
-            await server.OnReceived(packet);
-            return;
-        }
-        var session = GetSessions().FirstOrDefault(e => receiver.Equals(e.RemoteEndPoint));
+        var session = Sessions.FirstOrDefault(e => packet.Target.BelongsTo((IPEndPoint) e.RemoteEndPoint));
         if (session == null)
         {
-            Logger.LogDebug("Not found session, receiver : {}", receiver.ToString());
-            throw new Exception($"{receiver} offline.");
+            Logger.LogDebug("PacketRoute : route failed, {PacketTarget} offline", packet.Target);
+            return;
         }
-        // Logger.LogDebug("FindSession : {1}, Packet receiver : {3}", session.RemoteEndPoint.ToString(), receiver.ToString());
-        packet.Source = IPEndPoint;
         await session.SendAsync(packet);
     }
 
-    public Session[] GetSessions()
+    private async Task OnReceived(Packet packet, Session session)
     {
-        return _server.GetSessionContainer().GetSessions().Select(e => (Session) e).ToArray();
+        if (!packet.Target.BelongsTo(LocalEndPoint))
+        {
+            await SendAsync(packet);
+            return;
+        }
+        await base.OnReceived(packet);
     }
-    
-    public string[] List()
+
+    public async Task BroadcastAsync(Packet packet)
     {
-        var r = GetSessions().Select(e => e.RemoteEndPoint.ToString()!).ToList();
-        r.Add(IPEndPoint.ToString());
-        return r.ToArray();
+        foreach (var session in Sessions)
+        {
+            await session.SendAsync(packet);
+        }
     }
 }
