@@ -8,11 +8,12 @@ var masterIp = args[0];
 var runAsClient = args.Length > 1 && args[1] == "cli";
 
 
-Cable.Master = masterIp;
-Cable.RunAsClient = runAsClient;
-var cable = Cable.GetInstance();
+// Cable.Master = masterIp;
+// Cable.RunAsClient = runAsClient;
+// var cable = Cable.GetInstance();
+var cable = new Cable(masterIp, runAsClient);
 
-var fiber = new Fiber(cable);
+var fiber = cable.Create(0);
 fiber.Replies.Add(packet =>
 {
     Console.WriteLine($" > {packet.RequestContent.SequenceEqual("ping"u8.ToArray())}");

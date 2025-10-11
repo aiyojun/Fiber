@@ -6,41 +6,28 @@ namespace FiberDistro.Core;
 public class Cable
 {
     public readonly ILogger Logger = LoggerProvider.Logger;
-
-    private Cable()
-    {
-        var currentIp = Helper.GetNetworkAddress(Master);
-        if (currentIp == Master && !RunAsClient)
-            Sender = new Server(IPEndPoint.Parse($"{Master}:9876"));
-        else
-            Sender = new Client(IPEndPoint.Parse($"{Master}:9876"));
-        Sender.Received += OnReceived;
-    }
-
-    public static string Master = "10.1.16.37";
-
-    public static bool RunAsClient = false;
-
-    private static Cable? _instance;
-
-    public static Cable GetInstance()
-    {
-        _instance ??= new Cable();
-        return _instance;
-    }
-
+    
     private readonly Dictionary<int, Fiber> _fibers = new();
 
     public Transceiver Sender { get; }
-
-    public void Join(Fiber fiber)
+    
+    public Cable(string master, bool runAsClient = false)
     {
-        _fibers.Add(fiber.Id, fiber);
+        var currentIp = Helper.GetNetworkAddress(master);
+        if (currentIp == master && !runAsClient)
+            Sender = new Server(IPEndPoint.Parse($"{master}:9876"));
+        else
+            Sender = new Client(IPEndPoint.Parse($"{master}:9876"));
+        Sender.Received += OnReceived;
+        Logger.LogInformation("Run as {Name}, Master : {Master}", Sender.GetType().Name, master);
     }
 
-    public int Count()
+    public Fiber Create(int id)
     {
-        return _fibers.Count;
+        var fiber = new Fiber(this, id);
+        Logger.LogDebug("Fiber id: {FiberId}", fiber.Id);
+        _fibers.Add(fiber.Id, fiber);
+        return fiber;
     }
 
     public async Task SendAsync(Packet packet)
