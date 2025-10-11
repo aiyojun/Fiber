@@ -1,14 +1,15 @@
 ﻿using System.Net;
+using FiberDistro.Core;
 using Microsoft.Extensions.Logging;
 using SuperSocket.Client;
 
-namespace FiberDistro.Core;
+namespace FiberDistro.Naive;
 
-public class Client : Transceiver, IDisposable
+public class Client
 {
     public readonly ILogger Logger = LoggerProvider.Logger;
 
-    private readonly IEasyClient<Packet> _client;
+    private readonly IEasyClient<byte[]> _client;
 
     private readonly int _interval;
 
@@ -17,13 +18,15 @@ public class Client : Transceiver, IDisposable
     private bool _disposed;
 
     public readonly IPEndPoint RemoteEndPoint;
+    
+    public event Action<byte[]>? Received; 
 
     public Client(IPEndPoint serverEndPoint, int reconnectTimeout = 5)
     {
         RemoteEndPoint = serverEndPoint;
         _interval = reconnectTimeout;
         var port = Helper.FindAvailablePort(serverEndPoint.Port);
-        _client = new EasierClient(new TransportPipelineFilter()).AsClient();
+        _client = new EasyClient<byte[]>(new PipelineFilter()!).AsClient();
         _client.LocalEndPoint = IPEndPoint.Parse($"0.0.0.0:{port}");
         Logger.LogDebug("Binding port {port}", port);
         _ = KeepAlive(_cancellation.Token);
@@ -43,7 +46,12 @@ public class Client : Transceiver, IDisposable
         _client.Dispose();
         _disposed = true;
     }
-
+    
+    public async Task SendAsync(byte[] packet)
+    {
+        await _client.SendAsync(packet);
+    }
+    
     private async Task KeepAlive(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
@@ -52,10 +60,24 @@ public class Client : Transceiver, IDisposable
             {
                 if (!await _client.ConnectAsync(RemoteEndPoint, _cancellation.Token))
                     throw new Exception();
-                var endpoint = (IPEndPoint)((EasierClient)_client).GetLocalEndPoint();
-                LocalEndPoint =
-                    IPEndPoint.Parse($"{Helper.GetNetworkAddress(RemoteEndPoint.Address.ToString())}:{endpoint.Port}");
-                await Work(token);
+                // var endpoint = (IPEndPoint)(_client).GetLocalEndPoint();
+                // LocalEndPoint =
+                    // IPEndPoint.Parse($"{Helper.GetNetworkAddress(RemoteEndPoint.Address.ToString())}:{endpoint.Port}");
+                while (!token.IsCancellationRequested)
+                {
+                    var packet = await _client.ReceiveAsync();
+                    if (packet == null)
+                        break;
+                    try
+                    {
+                        Received?.Invoke(packet);
+                        // await OnReceived(packet);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogError(e.ToString());
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -65,35 +87,5 @@ public class Client : Transceiver, IDisposable
 
             await Task.Delay(TimeSpan.FromSeconds(_interval), token);
         }
-    }
-
-    private async Task Work(CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
-        {
-            var packet = await _client.ReceiveAsync();
-            if (packet == null)
-                break;
-            try
-            {
-                await OnReceived(packet);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e.ToString());
-            }
-        }
-    }
-
-    public override async Task SendAsync(Packet packet)
-    {
-        await _client.SendAsync(packet.ToArray());
-    }
-
-    public new async Task OnReceived(Packet packet)
-    {
-        if (!packet.Target.BelongsTo(LocalEndPoint))
-            return;
-        await base.OnReceived(packet);
     }
 }
