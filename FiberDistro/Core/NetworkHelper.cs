@@ -3,7 +3,7 @@ using System.Net.NetworkInformation;
 
 namespace FiberDistro.Core;
 
-public static class Helper
+public static class NetworkHelper
 {
     public static string GetNetworkAddress(string network)
     {

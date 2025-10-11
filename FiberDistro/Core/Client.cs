@@ -22,7 +22,7 @@ public class Client : Transceiver, IDisposable
     {
         RemoteEndPoint = serverEndPoint;
         _interval = reconnectTimeout;
-        var port = Helper.FindAvailablePort(serverEndPoint.Port);
+        var port = NetworkHelper.FindAvailablePort(serverEndPoint.Port);
         _client = new EasierClient(new TransportPipelineFilter()).AsClient();
         _client.LocalEndPoint = IPEndPoint.Parse($"0.0.0.0:{port}");
         Logger.LogDebug("Binding port {port}", port);
@@ -54,7 +54,7 @@ public class Client : Transceiver, IDisposable
                     throw new Exception();
                 var endpoint = (IPEndPoint)((EasierClient)_client).GetLocalEndPoint();
                 LocalEndPoint =
-                    IPEndPoint.Parse($"{Helper.GetNetworkAddress(RemoteEndPoint.Address.ToString())}:{endpoint.Port}");
+                    IPEndPoint.Parse($"{NetworkHelper.GetNetworkAddress(RemoteEndPoint.Address.ToString())}:{endpoint.Port}");
                 await Work(token);
             }
             catch (Exception e)

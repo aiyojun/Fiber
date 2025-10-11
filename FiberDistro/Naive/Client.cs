@@ -25,7 +25,7 @@ public class Client
     {
         RemoteEndPoint = serverEndPoint;
         _interval = reconnectTimeout;
-        var port = Helper.FindAvailablePort(serverEndPoint.Port);
+        var port = NetworkHelper.FindAvailablePort(serverEndPoint.Port);
         _client = new EasyClient<byte[]>(new PipelineFilter()!).AsClient();
         _client.LocalEndPoint = IPEndPoint.Parse($"0.0.0.0:{port}");
         Logger.LogDebug("Binding port {port}", port);

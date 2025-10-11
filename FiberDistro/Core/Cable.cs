@@ -13,7 +13,7 @@ public class Cable
     
     public Cable(string master, bool runAsClient = false)
     {
-        var currentIp = Helper.GetNetworkAddress(master);
+        var currentIp = NetworkHelper.GetNetworkAddress(master);
         if (currentIp == master && !runAsClient)
             Sender = new Server(IPEndPoint.Parse($"{master}:9876"));
         else
